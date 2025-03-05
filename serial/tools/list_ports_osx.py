@@ -260,30 +260,23 @@ def search_for_locationID_in_interfaces(serial_interfaces, locationID):
 
 
 def comports(include_links=False):
-    # XXX include_links is currently ignored. are links in /dev even supported here?
-    # Scan for all iokit serial ports
     services = GetIOServicesByType('IOSerialBSDClient')
     ports = []
     serial_interfaces = scan_interfaces()
     for service in services:
-        # First, add the callout device file.
-        device = get_string_property(service, "IOCalloutDevice")
-        if device:
-            info = list_ports_common.ListPortInfo(device)
-            # If the serial port is implemented by IOUSBDevice
-            # NOTE IOUSBDevice was deprecated as of 10.11 and finally on Apple Silicon
-            # devices has been completely removed.  Thanks to @oskay for this patch.
-            usb_device = GetParentDeviceByType(service, "IOUSBHostDevice")
-            if not usb_device:
-                usb_device = GetParentDeviceByType(service, "IOUSBDevice")
+        # Liệt kê cả IOCalloutDevice và IOTTYDevice
+        callout_device = get_string_property(service, "IOCalloutDevice")
+        tty_device = get_string_property(service, "IOTTYDevice")
+
+        # Thêm IOCalloutDevice
+        if callout_device:
+            info = list_ports_common.ListPortInfo(callout_device)
+            # Thêm thông tin USB (nếu có)
+            usb_device = GetParentDeviceByType(service, "IOUSBHostDevice") or GetParentDeviceByType(service, "IOUSBDevice")
             if usb_device:
-                # fetch some useful information from properties
                 info.vid = get_int_property(usb_device, "idVendor", kCFNumberSInt16Type)
                 info.pid = get_int_property(usb_device, "idProduct", kCFNumberSInt16Type)
                 info.serial_number = get_string_property(usb_device, kUSBSerialNumberString)
-                # We know this is a usb device, so the
-                # IORegistryEntryName should always be aliased to the
-                # usb product name string descriptor.
                 info.product = IORegistryEntryGetName(usb_device) or 'n/a'
                 info.manufacturer = get_string_property(usb_device, kUSBVendorString)
                 locationID = get_int_property(usb_device, "locationID", kCFNumberSInt32Type)
@@ -291,6 +284,24 @@ def comports(include_links=False):
                 info.interface = search_for_locationID_in_interfaces(serial_interfaces, locationID)
                 info.apply_usb_info()
             ports.append(info)
+
+        # Thêm IOTTYDevice
+        if tty_device:
+            info = list_ports_common.ListPortInfo(tty_device)
+            # Thêm thông tin USB (nếu có)
+            usb_device = GetParentDeviceByType(service, "IOUSBHostDevice") or GetParentDeviceByType(service, "IOUSBDevice")
+            if usb_device:
+                info.vid = get_int_property(usb_device, "idVendor", kCFNumberSInt16Type)
+                info.pid = get_int_property(usb_device, "idProduct", kCFNumberSInt16Type)
+                info.serial_number = get_string_property(usb_device, kUSBSerialNumberString)
+                info.product = IORegistryEntryGetName(usb_device) or 'n/a'
+                info.manufacturer = get_string_property(usb_device, kUSBVendorString)
+                locationID = get_int_property(usb_device, "locationID", kCFNumberSInt32Type)
+                info.location = location_to_string(locationID)
+                info.interface = search_for_locationID_in_interfaces(serial_interfaces, locationID)
+                info.apply_usb_info()
+            ports.append(info)
+
     return ports
 
 # test
