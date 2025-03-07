@@ -542,15 +542,30 @@ class Serial(SerialBase, PlatformSpecific):
     def close(self):
         """Close port"""
         if self.is_open:
+            # Đóng fd chính
             if self.fd is not None:
-                os.close(self.fd)
+                try:
+                    os.close(self.fd)
+                except OSError as e:
+                    print(f"Lỗi khi đóng self.fd: {e}")
                 self.fd = None
-                os.close(self.pipe_abort_read_w)
-                os.close(self.pipe_abort_read_r)
-                os.close(self.pipe_abort_write_w)
-                os.close(self.pipe_abort_write_r)
-                self.pipe_abort_read_r, self.pipe_abort_read_w = None, None
-                self.pipe_abort_write_r, self.pipe_abort_write_w = None, None
+
+            # Đóng các pipe và kiểm tra None
+            pipes = [
+                ('pipe_abort_read_w', self.pipe_abort_read_w),
+                ('pipe_abort_read_r', self.pipe_abort_read_r),
+                ('pipe_abort_write_w', self.pipe_abort_write_w),
+                ('pipe_abort_write_r', self.pipe_abort_write_r),
+            ]
+
+            for name, pipe in pipes:
+                if pipe is not None:
+                    try:
+                        os.close(pipe)
+                    except OSError as e:
+                        print(f"Lỗi khi đóng {name}: {e}")
+                    setattr(self, name, None)
+
             self.is_open = False
 
     #  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
